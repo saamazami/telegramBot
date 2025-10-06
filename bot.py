@@ -1,14 +1,16 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-import os
+# توکن مستقیم (فقط برای تست)
+TOKEN = "8270187709:AAHdH9SaJqXFD_-FTKHkYd0QKlGtKOk8yFU"
 
-TOKEN = os.getenv("TOKEN") or "توکن‌تو اینجا بذار فقط برای تست"
-
+# فرمان /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("سلام سام 👋")
 
+# اجرای ربات
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.run_polling()
+
