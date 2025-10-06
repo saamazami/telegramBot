@@ -1,15 +1,8 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-
-# توکن مستقیم (فقط برای تست)
-TOKEN = "8270187709:AAHdH9SaJqXFD_-FTKHkYd0QKlGtKOk8yFU"
-
-
 
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-TOKEN = "توکن_خودتو_اینجا_بذار"
+TOKEN = "8270187709:AAHdH9SaJqXFD_-FTKHkYd0QKlGtKOk8yFU"
 
 menu_keyboard = [
     ["ثبت نام", "ورود"],
@@ -56,3 +49,4 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
     app.run_polling()
+
