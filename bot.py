@@ -1,78 +1,90 @@
-import os
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+    ConversationHandler
+)
+import requests
+
+# مراحل کانورسیشن
+CHOOSING, LOGIN = range(2)
 
 # توکن رو از متغیر محیطی می‌خونیم (ایمن‌تره)
 TOKEN = os.getenv("TOKEN")
 
-# تعریف منوی اصلی با دکمه‌ها
-main_menu = ReplyKeyboardMarkup(
-    [
-        ["ثبت نام", "ورود"],
-        ["پشتیبانی", "تمرینات"],
-        ["شکایت", "بک تست"]
-    ],
-    resize_keyboard=True
-)
+# منوی اصلی به صورت کیبورد
+main_menu_keyboard = [
+    ["ثبت نام", "ورود"],
+    ["پشتیبانی", "تمرینات"],
+    ["شکایت", "بک تست"]
+]
+main_menu_markup = ReplyKeyboardMarkup(main_menu_keyboard, resize_keyboard=True)
 
-ENTERING = 1  # مرحله گرفتن اطلاعات ورود
-
-# وقتی /start زده میشه یا هر وقت منو بخواد نمایش داده بشه
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # وقتی کاربر وارد شد، منو رو نشون بده
     await update.message.reply_text(
-        "سلام! منو را انتخاب کنید:",
-        reply_markup=main_menu
+        "سلام! لطفا یکی از گزینه‌های زیر را انتخاب کنید:",
+        reply_markup=main_menu_markup
     )
+    return CHOOSING
 
-# وقتی کاربر روی "ورود" میزنه
-async def login_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("لطفا شناسه یا نام کاربری خود را وارد کنید:")
-    return ENTERING
+async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    if text == "ورود":
+        await update.message.reply_text("لطفا نام کاربری خود را وارد کنید:")
+        return LOGIN
+    else:
+        # برای سایر گزینه‌ها فقط یه پاسخ ساده می‌دیم (می‌تونی توسعه بدی)
+        await update.message.reply_text(f"شما گزینه‌ی {text} را انتخاب کردید. فعلا در حال توسعه است.")
+        return CHOOSING
 
-# گرفتن شناسه از کاربر
-async def receive_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_input = update.message.text
-    
-    # اینجا درخواست به n8n (مثلا یک وب‌هوک) می‌فرستیم و نتیجه میگیریم
-    n8n_webhook_url = "https://your-n8n-instance/webhook/login-check"  # این آدرس رو به آدرس درست تغییر بده
-    
+async def login(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = update.message.text
+    # اینجا باید به n8n درخواست بفرستی برای چک کردن نام کاربری
+    # مثلا فرض کن n8n یه API داره به این آدرس:
+    n8n_api_url = "https://your-n8n-instance.com/webhook/check_login"
     try:
-        response = requests.post(n8n_webhook_url, json={"username": user_input})
-        data = response.json()
-        
-        if data.get("valid"):  # فرض میکنیم n8n جواب میده {"valid": True, "name": "اسم کاربر"}
-            name = data.get("name", "کاربر")
-            await update.message.reply_text(f"خوش آمدی، {name}!")
+        response = requests.post(n8n_api_url, json={"username": username})
+        response_data = response.json()
+        if response.status_code == 200 and response_data.get("valid"):
+            await update.message.reply_text(f"خوش آمدید {username} عزیز! شما با موفقیت وارد شدید.")
         else:
-            await update.message.reply_text("شناسه معتبر نیست. لطفا دوباره تلاش کنید.")
+            await update.message.reply_text("نام کاربری یا رمز عبور اشتباه است. لطفا دوباره تلاش کنید.")
     except Exception as e:
-        await update.message.reply_text("خطا در ارتباط با سرور. لطفا بعدا تلاش کنید.")
-        print(f"Error contacting n8n: {e}")
-    
-    # بعد از ورود یا تلاش ناموفق، منو رو دوباره بفرست
-    await update.message.reply_text("منو را انتخاب کنید:", reply_markup=main_menu)
-    return ConversationHandler.END
+        await update.message.reply_text("خطایی رخ داد، لطفا بعدا دوباره تلاش کنید.")
+        print(e)
+
+    # بعد از ورود یا خطا برمی‌گردیم به منو
+    await update.message.reply_text(
+        "لطفا یکی از گزینه‌های زیر را انتخاب کنید:",
+        reply_markup=main_menu_markup
+    )
+    return CHOOSING
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("عملیات لغو شد.", reply_markup=main_menu)
+    await update.message.reply_text("عملیات لغو شد. برای شروع مجدد /start را بزنید.")
     return ConversationHandler.END
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^(ورود)$'), login_start)],
+        entry_points=[CommandHandler('start', start)],
         states={
-            ENTERING: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_login)],
+            CHOOSING: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice)],
+            LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, login)],
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel)],
     )
 
-    app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
 
+    print("Bot is running...")
     app.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 
