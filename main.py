@@ -9,4 +9,3 @@ from telegram.ext import (
 )
 import os
 import re
-import requests
