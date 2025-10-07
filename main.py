@@ -1,4 +1,12 @@
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(conv_handler)
-    app.run_polling()
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    ConversationHandler,
+    filters,
+)
+import os
+import re
+import requests
