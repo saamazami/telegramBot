@@ -1,3 +1,4 @@
+import os
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -7,15 +8,26 @@ from telegram.ext import (
     filters,
     ConversationHandler
 )
-import requests
+import logging
+
+# لاگ برای دیباگ راحت‌تر
+logging.basicConfig(level=logging.INFO)
 
 # مراحل کانورسیشن
-CHOOSING, LOGIN = range(2)
+(
+    CHOOSING,
+    LOGIN,
+    SIGNUP_NAME,
+    SIGNUP_TELEGRAM,
+    SIGNUP_PHONE,
+    SIGNUP_EMAIL,
+    SIGNUP_INSTAGRAM
+) = range(7)
 
-# توکن رو از متغیر محیطی می‌خونیم (ایمن‌تره)
+# توکن
 TOKEN = os.getenv("TOKEN")
 
-# منوی اصلی به صورت کیبورد
+# منوی اصلی
 main_menu_keyboard = [
     ["ثبت نام", "ورود"],
     ["پشتیبانی", "تمرینات"],
@@ -23,68 +35,107 @@ main_menu_keyboard = [
 ]
 main_menu_markup = ReplyKeyboardMarkup(main_menu_keyboard, resize_keyboard=True)
 
+# Start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # وقتی کاربر وارد شد، منو رو نشون بده
     await update.message.reply_text(
         "سلام! لطفا یکی از گزینه‌های زیر را انتخاب کنید:",
         reply_markup=main_menu_markup
     )
     return CHOOSING
 
+# انتخاب کاربر از منو
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    if text == "ورود":
-        await update.message.reply_text("لطفا نام کاربری خود را وارد کنید:")
-        return LOGIN
-    else:
-        # برای سایر گزینه‌ها فقط یه پاسخ ساده می‌دیم (می‌تونی توسعه بدی)
-        await update.message.reply_text(f"شما گزینه‌ی {text} را انتخاب کردید. فعلا در حال توسعه است.")
+    user_choice = update.message.text
+
+    if user_choice == "ورود":
+        await update.message.reply_text("فعلاً ورود پیاده‌سازی نشده.")
         return CHOOSING
 
-async def login(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.message.text
-    # اینجا باید به n8n درخواست بفرستی برای چک کردن نام کاربری
-    # مثلا فرض کن n8n یه API داره به این آدرس:
-    n8n_api_url = "https://your-n8n-instance.com/webhook/check_login"
-    try:
-        response = requests.post(n8n_api_url, json={"username": username})
-        response_data = response.json()
-        if response.status_code == 200 and response_data.get("valid"):
-            await update.message.reply_text(f"خوش آمدید {username} عزیز! شما با موفقیت وارد شدید.")
-        else:
-            await update.message.reply_text("نام کاربری یا رمز عبور اشتباه است. لطفا دوباره تلاش کنید.")
-    except Exception as e:
-        await update.message.reply_text("خطایی رخ داد، لطفا بعدا دوباره تلاش کنید.")
-        print(e)
+    elif user_choice == "ثبت نام":
+        await update.message.reply_text("لطفاً نام کامل خود را وارد کنید:")
+        return SIGNUP_NAME
 
-    # بعد از ورود یا خطا برمی‌گردیم به منو
-    await update.message.reply_text(
-        "لطفا یکی از گزینه‌های زیر را انتخاب کنید:",
-        reply_markup=main_menu_markup
+    elif user_choice == "پشتیبانی":
+        await update.message.reply_text("برای پشتیبانی با @support تماس بگیرید.")
+        return CHOOSING
+
+    elif user_choice == "تمرینات":
+        await update.message.reply_text("تمرینات به‌زودی اضافه خواهد شد.")
+        return CHOOSING
+
+    elif user_choice == "شکایت":
+        await update.message.reply_text("لطفاً شکایت خود را به آیدی @complaints ارسال کنید.")
+        return CHOOSING
+
+    elif user_choice == "بک تست":
+        await update.message.reply_text("بک‌تست در حال توسعه است.")
+        return CHOOSING
+
+    else:
+        await update.message.reply_text("لطفا یک گزینه معتبر انتخاب کنید.")
+        return CHOOSING
+
+# ثبت‌نام - مرحله 1: نام
+async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["name"] = update.message.text
+    await update.message.reply_text("آیدی تلگرام خود را وارد کنید (با @):")
+    return SIGNUP_TELEGRAM
+
+# ثبت‌نام - مرحله 2: تلگرام
+async def get_telegram_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["telegram_id"] = update.message.text
+    await update.message.reply_text("شماره تلفن خود را وارد کنید:")
+    return SIGNUP_PHONE
+
+# ثبت‌نام - مرحله 3: تلفن
+async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["phone"] = update.message.text
+    await update.message.reply_text("ایمیل خود را وارد کنید:")
+    return SIGNUP_EMAIL
+
+# ثبت‌نام - مرحله 4: ایمیل
+async def get_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["email"] = update.message.text
+    await update.message.reply_text("آیدی اینستاگرام خود را وارد کنید (بدون @):")
+    return SIGNUP_INSTAGRAM
+
+# ثبت‌نام - مرحله 5: اینستاگرام
+async def get_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["instagram"] = update.message.text
+
+    data = context.user_data
+    msg = (
+        "✅ اطلاعات ثبت‌نام:\n"
+        f"👤 نام: {data['name']}\n"
+        f"📱 تلگرام: {data['telegram_id']}\n"
+        f"📞 شماره: {data['phone']}\n"
+        f"📧 ایمیل: {data['email']}\n"
+        f"📸 اینستا: {data['instagram']}"
     )
+
+    await update.message.reply_text(msg)
+    await update.message.reply_text("✅ ثبت‌نام با موفقیت انجام شد.", reply_markup=main_menu_markup)
+
+    # اینجا می‌تونی اطلاعات رو به API یا دیتابیس بفرستی
+
     return CHOOSING
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("عملیات لغو شد. برای شروع مجدد /start را بزنید.")
-    return ConversationHandler.END
+# ساخت هندلر گفتگو
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("start", start)],
+    states={
+        CHOOSING: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice)],
+        SIGNUP_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
+        SIGNUP_TELEGRAM: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_telegram_id)],
+        SIGNUP_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
+        SIGNUP_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_email)],
+        SIGNUP_INSTAGRAM: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_instagram)],
+    },
+    fallbacks=[],
+)
 
-def main():
+# اجرای ربات
+if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            CHOOSING: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice)],
-            LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, login)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
-
     app.add_handler(conv_handler)
-
-    print("Bot is running...")
     app.run_polling()
-
-if __name__ == '__main__':
-    main()
-
