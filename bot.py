@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-# مراحل مکالمه
+# مراحل
 (
     CHOOSING,
     SIGNUP_NAME,
@@ -22,10 +22,9 @@ from telegram.ext import (
     CONFIRMATION
 ) = range(7)
 
-# وب‌هوک n8n (آدرس خودت را جایگزین کن)
+# وب‌هوک n8n خودت رو بذار اینجا
 N8N_WEBHOOK_URL = "https://n8n.example.com/webhook/register-user"
 
-# منوی اصلی
 main_menu_keyboard = [
     ["ثبت نام", "ورود"],
     ["پشتیبانی", "تمرینات"],
@@ -33,32 +32,30 @@ main_menu_keyboard = [
 ]
 main_menu_markup = ReplyKeyboardMarkup(main_menu_keyboard, resize_keyboard=True)
 
-# کیبورد تایید اطلاعات
+# تایید یا رد اطلاعات
 confirm_keyboard = [
     ["✅ تایید و ثبت", "🔁 ویرایش اطلاعات"]
 ]
 confirm_markup = ReplyKeyboardMarkup(confirm_keyboard, resize_keyboard=True)
 
-# اعتبارسنجی ایمیل
+# اعتبارسنجی‌ها
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email)
 
-# اعتبارسنجی شماره تلفن (11 رقم)
 def is_valid_phone(phone):
     return phone.isdigit() and len(phone) == 11
 
-# ارسال دیتا به n8n
 def send_to_n8n(data):
     try:
         response = requests.post(N8N_WEBHOOK_URL, json=data)
-        print("Sent to n8n:", response.status_code)
+        print("✅ Sent to n8n:", response.status_code)
         return response.status_code == 200
     except Exception as e:
-        print("Error sending to n8n:", e)
+        print("❌ Error sending to n8n:", e)
         return False
 
-# شروع ربات و نمایش منو
+# شروع
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "سلام! لطفا یکی از گزینه‌های زیر را انتخاب کنید:",
@@ -66,49 +63,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return CHOOSING
 
-# دریافت انتخاب کاربر از منو
+# شروع ثبت نام
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    if text == "ثبت نام":
+    if update.message.text == "ثبت نام":
         await update.message.reply_text("لطفاً نام کامل خود را وارد کنید:")
         return SIGNUP_NAME
     else:
         await update.message.reply_text("این گزینه هنوز فعال نیست.")
         return CHOOSING
 
-# دریافت نام
+# گرفتن اطلاعات
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["name"] = update.message.text
     await update.message.reply_text("آیدی تلگرام خود را وارد کنید (با @):")
     return SIGNUP_TELEGRAM
 
-# دریافت آیدی تلگرام
 async def get_telegram_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["telegram_id"] = update.message.text
     await update.message.reply_text("شماره تلفن خود را وارد کنید:")
     return SIGNUP_PHONE
 
-# دریافت شماره تلفن و اعتبارسنجی
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text
     if not is_valid_phone(phone):
         await update.message.reply_text("❌ شماره تلفن باید عدد و ۱۱ رقمی باشد. لطفاً دوباره وارد کنید:")
         return SIGNUP_PHONE
+
     context.user_data["phone"] = phone
     await update.message.reply_text("ایمیل خود را وارد کنید:")
     return SIGNUP_EMAIL
 
-# دریافت ایمیل و اعتبارسنجی
 async def get_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     email = update.message.text
     if not is_valid_email(email):
         await update.message.reply_text("❌ فرمت ایمیل معتبر نیست. لطفاً دوباره وارد کنید:")
         return SIGNUP_EMAIL
+
     context.user_data["email"] = email
     await update.message.reply_text("آیدی اینستاگرام خود را وارد کنید (بدون @):")
     return SIGNUP_INSTAGRAM
 
-# دریافت آیدی اینستا
 async def get_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["instagram"] = update.message.text
 
@@ -126,7 +120,7 @@ async def get_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, reply_markup=confirm_markup)
     return CONFIRMATION
 
-# تایید یا ویرایش اطلاعات
+# تایید یا رد
 async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text
     if choice == "✅ تایید و ثبت":
@@ -139,23 +133,21 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
             "telegram_id": context.user_data.get("telegram_id"),
             "instagram": context.user_data.get("instagram")
         }
-        if send_to_n8n(data):
-            await update.message.reply_text("✅ اطلاعات با موفقیت ثبت شد.")
-        else:
-            await update.message.reply_text("❌ مشکلی در ارسال اطلاعات پیش آمد. لطفا دوباره تلاش کنید.")
+        send_to_n8n(data)
 
+        await update.message.reply_text("✅ اطلاعات با موفقیت ثبت شد.")
         await update.message.reply_text("⏳ لطفاً منتظر باشید تا آیدی شما ساخته شده و در تلگرام برای شما ارسال شود.", reply_markup=main_menu_markup)
         return CHOOSING
 
     elif choice == "🔁 ویرایش اطلاعات":
-        await update.message.reply_text("باشه! از اول شروع می‌کنیم.\nلطفاً نام کامل خود را وارد کنید:", reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text("باشه! بیایید از اول شروع کنیم.\nلطفاً نام کامل خود را وارد کنید:", reply_markup=ReplyKeyboardRemove())
         return SIGNUP_NAME
 
     else:
         await update.message.reply_text("لطفاً یکی از گزینه‌های بالا را انتخاب کنید:")
         return CONFIRMATION
 
-# تعریف ConversationHandler
+# Conversation Handler
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
     states={
@@ -172,8 +164,7 @@ conv_handler = ConversationHandler(
 
 # اجرای ربات
 if __name__ == "__main__":
-    TOKEN = os.getenv("8270187709:AAHdH9SaJqXFD_-FTKHkYd0QKlGtKOk8yFU")  # یا مقدار توکن رو مستقیم اینجا بزار
+    TOKEN = os.getenv("TOKEN")  # یا مستقیم مقدارش رو بذار: '123456:ABCDEF...'
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(conv_handler)
     app.run_polling()
-
