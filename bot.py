@@ -157,6 +157,7 @@ conv_handler = ConversationHandler(
 
 # --- اجرای ربات ---
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(8270187709:AAHdH9SaJqXFD_-FTKHkYd0QKlGtKOk8yFU).build()
     app.add_handler(conv_handler)
     app.run_polling()
+
